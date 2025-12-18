@@ -1,0 +1,103 @@
+{
+  "name": "Haneui-Tracker",
+  "displayName": "Haneui-Tracker",
+  "description": "Cursor/VS Code에서 개발 활동을 추적하고 시각화하는 익스텐션",
+  "publisher": "Haneui-Tracker",
+  "license": "MIT",
+  "version": "0.0.5",
+  "icon": "images/icon.png",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "*"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "haneui-yoman.showStats",
+        "title": "개발 활동 통계 보기",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "haneui-yoman.resetStats",
+        "title": "통계 초기화",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "haneui-yoman.changePeriod",
+        "title": "기간 변경",
+        "icon": "$(calendar)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "haneui-yoman",
+          "title": "개발 활동",
+          "icon": "$(pulse)"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "haneuiYomanStats",
+        "contents": "개발 활동 통계를 확인하세요.\n[대시보드 열기](command:haneui-yoman.showStats)"
+      }
+    ],
+    "views": {
+      "haneui-yoman": [
+        {
+          "id": "haneuiYomanStats",
+          "name": "통계",
+          "when": "true"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "haneui-yoman.showStats",
+          "when": "view == haneuiYomanStats",
+          "group": "navigation"
+        },
+        {
+          "command": "haneui-yoman.changePeriod",
+          "when": "view == haneuiYomanStats",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "haneui-yoman.resetStats",
+          "when": "view == haneuiYomanStats",
+          "group": "inline"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test",
+    "package": "vsce package --no-yarn"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "typescript-eslint": "^8.46.3",
+    "eslint": "^9.39.1",
+    "typescript": "^5.9.3",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.7.1"
+  }
+}
