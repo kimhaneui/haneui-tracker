@@ -11,6 +11,7 @@ export class ActivityTracker {
   private lastActivityTime = Date.now();
   private isTracking = false;
   private fileLineCounts = new Map<string, number>(); // 파일별 마지막 라인 수
+  private lastCheckedDate: string; // 마지막으로 확인한 날짜
 
   constructor(
     context: vscode.ExtensionContext,
@@ -19,6 +20,23 @@ export class ActivityTracker {
     this.storage = new StorageManager(context);
     this.data = this.storage.loadData();
     this.statusBar = statusBar;
+
+    // 저장된 데이터에서 마지막 날짜 확인 (currentSession에 저장된 날짜 또는 dailyStats의 최신 날짜)
+    // 없으면 오늘 날짜로 초기화
+    const storedLastDate = (this.data as any).lastCheckedDate;
+    const todayKey = this.storage.getTodayKey();
+
+    // dailyStats에서 가장 최근 날짜 찾기
+    let latestDate = storedLastDate;
+    if (!latestDate && this.data.dailyStats.size > 0) {
+      const dates = Array.from(this.data.dailyStats.keys()).sort();
+      latestDate = dates[dates.length - 1];
+    }
+
+    this.lastCheckedDate = latestDate || todayKey;
+
+    // 날짜 변경 확인 및 세션 초기화
+    this.checkAndResetIfDateChanged();
 
     // 에디터 이벤트 리스너 등록
     this.setupEventListeners(context);
@@ -72,6 +90,9 @@ export class ActivityTracker {
       return;
     }
 
+    // 날짜 변경 확인
+    this.checkAndResetIfDateChanged();
+
     const now = Date.now();
     this.lastActivityTime = now;
     this.isTracking = true;
@@ -101,8 +122,29 @@ export class ActivityTracker {
     );
 
     // 라인 변경 계산 - 문서의 실제 라인 수 변화를 기준으로 계산
-    const beforeLineCount =
-      this.fileLineCounts.get(filePath) ?? e.document.lineCount;
+    // 파일 라인 수가 추적되지 않았으면 현재 문서의 라인 수로 초기화
+    if (!this.fileLineCounts.has(filePath)) {
+      // 변경 전 라인 수는 변경사항을 고려하여 계산
+      let beforeCount = e.document.lineCount;
+      for (const change of e.contentChanges) {
+        // 삭제된 라인 수 계산
+        if (change.range.start.line < change.range.end.line) {
+          beforeCount += change.range.end.line - change.range.start.line;
+          if (
+            change.range.end.character === 0 &&
+            change.range.end.line > change.range.start.line
+          ) {
+            beforeCount += 1;
+          }
+        }
+        // 추가된 라인 수 빼기
+        if (change.text.length > 0) {
+          beforeCount -= change.text.split("\n").length - 1;
+        }
+      }
+      this.fileLineCounts.set(filePath, beforeCount);
+    }
+    const beforeLineCount = this.fileLineCounts.get(filePath)!;
 
     // 모든 변경사항을 적용한 후의 예상 라인 수 계산
     let totalDeletedLines = 0;
@@ -163,6 +205,9 @@ export class ActivityTracker {
   }
 
   private handleEditorChange(): void {
+    // 날짜 변경 확인
+    this.checkAndResetIfDateChanged();
+
     const now = Date.now();
     this.lastActivityTime = now;
     this.isTracking = true;
@@ -208,6 +253,9 @@ export class ActivityTracker {
   }
 
   private updateCodingTime(): void {
+    // 날짜 변경 확인
+    this.checkAndResetIfDateChanged();
+
     if (!this.isTracking || !this.data.currentSession.startTime) {
       return;
     }
@@ -254,6 +302,126 @@ export class ActivityTracker {
       this.updateStatusBar();
       this.saveData();
     }, 60 * 1000);
+  }
+
+  // 날짜가 바뀌었는지 확인하고, 바뀌었으면 이전 날짜의 세션 데이터를 저장하고 초기화
+  private checkAndResetIfDateChanged(): void {
+    const todayKey = this.storage.getTodayKey();
+
+    // 날짜가 바뀌지 않았으면 아무것도 하지 않음
+    if (todayKey === this.lastCheckedDate) {
+      return;
+    }
+
+    // 날짜가 바뀌었음 - 이전 날짜의 세션 데이터를 dailyStats에 저장
+    const previousDateKey = this.lastCheckedDate;
+    if (previousDateKey && this.data.currentSession) {
+      // 이전 날짜의 통계 가져오기 또는 생성
+      let previousDayStats = this.data.dailyStats.get(previousDateKey);
+      if (!previousDayStats) {
+        previousDayStats = {
+          date: previousDateKey,
+          codingTime: 0,
+          keystrokes: 0,
+          filesEdited: new Set(),
+          linesAdded: 0,
+          linesDeleted: 0,
+          linesModified: 0,
+          languages: new Map(),
+        };
+      }
+
+      // 코딩 시간 계산 및 추가 (날짜 변경 전 마지막 활동 시간까지)
+      if (
+        this.isTracking &&
+        this.data.currentSession.startTime &&
+        this.data.currentSession.lastActivityTime
+      ) {
+        const now = Date.now();
+        const timeSinceLastActivity = now - this.lastActivityTime;
+        if (timeSinceLastActivity <= IDLE_THRESHOLD) {
+          const activeTime = Math.min(
+            this.data.currentSession.lastActivityTime -
+              this.data.currentSession.startTime,
+            IDLE_THRESHOLD
+          );
+          previousDayStats.codingTime += Math.floor(activeTime / 1000);
+        }
+      }
+
+      // 이전 날짜의 통계에 현재 세션 데이터 병합
+      const sessionData = this.data.currentSession;
+      if (
+        sessionData.keystrokes > 0 ||
+        sessionData.linesAdded > 0 ||
+        sessionData.linesDeleted > 0 ||
+        sessionData.linesModified > 0 ||
+        previousDayStats.codingTime > 0
+      ) {
+        previousDayStats.keystrokes += sessionData.keystrokes;
+        previousDayStats.linesAdded += sessionData.linesAdded;
+        previousDayStats.linesDeleted += sessionData.linesDeleted;
+        previousDayStats.linesModified =
+          (previousDayStats.linesModified || 0) +
+          (sessionData.linesModified || 0);
+
+        for (const file of sessionData.filesEdited) {
+          previousDayStats.filesEdited.add(file);
+        }
+
+        for (const [lang, count] of sessionData.languages.entries()) {
+          const currentCount = previousDayStats.languages.get(lang) || 0;
+          previousDayStats.languages.set(lang, currentCount + count);
+        }
+
+        // 이전 날짜의 통계를 저장
+        this.data.dailyStats.set(previousDateKey, previousDayStats);
+      }
+    }
+
+    // 오늘 날짜의 dailyStats 초기화 (코딩 시간과 수정한 라인만 유지)
+    // 기존 오늘 날짜의 통계가 있다면 코딩 시간과 수정한 라인만 보존
+    const existingTodayStats = this.data.dailyStats.get(todayKey);
+    const preservedCodingTime = existingTodayStats?.codingTime || 0;
+    const preservedLinesModified = existingTodayStats?.linesModified || 0;
+
+    // 오늘 날짜의 통계를 코딩 시간과 수정한 라인만 남기고 완전히 초기화
+    const resetTodayStats = {
+      date: todayKey,
+      codingTime: preservedCodingTime,
+      keystrokes: 0,
+      filesEdited: new Set(),
+      linesAdded: 0,
+      linesDeleted: 0,
+      linesModified: preservedLinesModified,
+      languages: new Map(),
+    };
+    // 명시적으로 Map에 설정하여 기존 값을 덮어씀
+    this.data.dailyStats.set(todayKey, resetTodayStats);
+
+    // 현재 세션 초기화
+    this.data.currentSession = {
+      keystrokes: 0,
+      filesEdited: new Set(),
+      linesAdded: 0,
+      linesDeleted: 0,
+      linesModified: 0,
+      languages: new Map(),
+      startTime: undefined,
+      lastActivityTime: undefined,
+    };
+
+    // 파일 라인 수 추적도 초기화 (새 날짜이므로)
+    this.fileLineCounts.clear();
+
+    // 날짜 업데이트
+    this.lastCheckedDate = todayKey;
+
+    // 마지막 확인 날짜를 데이터에 저장
+    (this.data as any).lastCheckedDate = todayKey;
+
+    // 데이터 저장
+    this.saveData();
   }
 
   private updateStatusBar(): void {
@@ -350,6 +518,8 @@ export class ActivityTracker {
   async resetStats(): Promise<void> {
     await this.storage.resetStats();
     this.data = this.storage.loadData();
+    this.lastCheckedDate = this.storage.getTodayKey();
+    this.fileLineCounts.clear();
     this.updateStatusBar();
   }
 

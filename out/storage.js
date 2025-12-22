@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StorageManager = void 0;
-const STORAGE_KEY = 'haneui-yoman.stats';
+const STORAGE_KEY = "haneui-yoman.stats";
 class StorageManager {
     context;
     constructor(context) {
@@ -43,6 +43,7 @@ class StorageManager {
                 filesEdited: new Set(stored.currentSession?.filesEdited || []),
                 languages: new Map(Object.entries(stored.currentSession?.languages || {})),
             },
+            lastCheckedDate: stored.lastCheckedDate,
         };
     }
     // 데이터 저장
@@ -55,6 +56,7 @@ class StorageManager {
                 filesEdited: Array.from(data.currentSession.filesEdited),
                 languages: Object.fromEntries(data.currentSession.languages),
             },
+            lastCheckedDate: data.lastCheckedDate,
         };
         for (const [date, stats] of data.dailyStats.entries()) {
             serializable.dailyStats[date] = {
@@ -68,7 +70,7 @@ class StorageManager {
     // 오늘 날짜 키 가져오기
     getTodayKey() {
         const today = new Date();
-        return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
     }
     // 오늘의 통계 가져오기 또는 생성
     getTodayStats(data) {
