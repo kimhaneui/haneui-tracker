@@ -4,7 +4,7 @@
   "description": "Cursor/VS Code에서 개발 활동을 추적하고 시각화하는 익스텐션",
   "publisher": "Haneui-Tracker",
   "license": "MIT",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "icon": "images/icon.png",
   "engines": {
     "vscode": "^1.80.0"
