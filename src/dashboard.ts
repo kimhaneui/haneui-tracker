@@ -175,6 +175,10 @@ export class Dashboard {
 			<div class="stat-label">편집한 파일</div>
 		</div>
 		<div class="stat-card">
+			<div class="stat-value">${(stats.linesModified || 0).toLocaleString()}</div>
+			<div class="stat-label">수정한 라인</div>
+		</div>
+		<div class="stat-card">
 			<div class="stat-value">${stats.linesAdded.toLocaleString()}</div>
 			<div class="stat-label">추가한 라인</div>
 		</div>

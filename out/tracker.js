@@ -36,7 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ActivityTracker = void 0;
 const vscode = __importStar(require("vscode"));
 const storage_1 = require("./storage");
-const IDLE_THRESHOLD = 5 * 60 * 1000; // 5분 (밀리초)
+const IDLE_THRESHOLD = 10 * 60 * 1000; // 10분 (밀리초)
 class ActivityTracker {
     storage;
     data;
@@ -86,7 +86,7 @@ class ActivityTracker {
         context.subscriptions.push(focusDisposable);
     }
     handleTextChange(e) {
-        if (e.document.uri.scheme !== 'file') {
+        if (e.document.uri.scheme !== "file") {
             return;
         }
         const now = Date.now();
@@ -97,7 +97,7 @@ class ActivityTracker {
         for (const change of e.contentChanges) {
             if (change.text.length > 0) {
                 // 입력된 텍스트의 줄 수 계산
-                const linesInChange = change.text.split('\n').length;
+                const linesInChange = change.text.split("\n").length;
                 totalLinesTyped += linesInChange;
             }
         }
@@ -121,13 +121,14 @@ class ActivityTracker {
                 // 여러 라인에 걸쳐 삭제
                 totalDeletedLines += change.range.end.line - change.range.start.line;
                 // end.character가 0이고 start.line과 다르면 마지막 라인도 완전히 삭제됨
-                if (change.range.end.character === 0 && change.range.end.line > change.range.start.line) {
+                if (change.range.end.character === 0 &&
+                    change.range.end.line > change.range.start.line) {
                     totalDeletedLines += 1;
                 }
             }
             // 추가된 라인 수 계산
             if (change.text.length > 0) {
-                const addedLines = change.text.split('\n').length;
+                const addedLines = change.text.split("\n").length;
                 totalAddedLines += addedLines;
             }
         }
@@ -163,7 +164,7 @@ class ActivityTracker {
         this.isTracking = true;
         // 현재 에디터의 라인 수 저장
         const activeEditor = vscode.window.activeTextEditor;
-        if (activeEditor && activeEditor.document.uri.scheme === 'file') {
+        if (activeEditor && activeEditor.document.uri.scheme === "file") {
             const filePath = activeEditor.document.uri.fsPath;
             this.fileLineCounts.set(filePath, activeEditor.document.lineCount);
         }
@@ -173,7 +174,7 @@ class ActivityTracker {
         this.data.currentSession.lastActivityTime = now;
     }
     handleFileSave(doc) {
-        if (doc.uri.scheme !== 'file') {
+        if (doc.uri.scheme !== "file") {
             return;
         }
         this.data.currentSession.filesEdited.add(doc.uri.fsPath);
@@ -204,7 +205,8 @@ class ActivityTracker {
         // 5분 이상 비활성 상태면 코딩 시간 계산 중단
         if (timeSinceLastActivity > IDLE_THRESHOLD) {
             if (this.data.currentSession.lastActivityTime) {
-                const activeTime = Math.min(this.data.currentSession.lastActivityTime - this.data.currentSession.startTime, IDLE_THRESHOLD);
+                const activeTime = Math.min(this.data.currentSession.lastActivityTime -
+                    this.data.currentSession.startTime, IDLE_THRESHOLD);
                 this.addCodingTime(activeTime);
             }
             this.isTracking = false;
@@ -281,8 +283,12 @@ class ActivityTracker {
             keystrokes: todayStats.keystrokes + this.data.currentSession.keystrokes,
             linesAdded: todayStats.linesAdded + this.data.currentSession.linesAdded,
             linesDeleted: todayStats.linesDeleted + this.data.currentSession.linesDeleted,
-            linesModified: todayStats.linesModified + this.data.currentSession.linesModified,
-            filesEdited: new Set([...todayStats.filesEdited, ...this.data.currentSession.filesEdited]),
+            linesModified: (todayStats.linesModified || 0) +
+                this.data.currentSession.linesModified,
+            filesEdited: new Set([
+                ...todayStats.filesEdited,
+                ...this.data.currentSession.filesEdited,
+            ]),
             languages: new Map(todayStats.languages),
         };
         // 언어 병합
@@ -334,7 +340,7 @@ class ActivityTracker {
         };
         // 비동기 저장 (완료를 기다리지 않음)
         this.storage.saveData(this.data).catch((err) => {
-            console.error('Failed to save data on dispose:', err);
+            console.error("Failed to save data on dispose:", err);
         });
     }
 }

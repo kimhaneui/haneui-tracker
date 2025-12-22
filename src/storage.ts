@@ -96,6 +96,10 @@ export class StorageManager {
 			};
 			data.dailyStats.set(todayKey, todayStats);
 		}
+		// linesModified가 없을 수 있으므로 기본값 설정
+		if (todayStats.linesModified === undefined) {
+			todayStats.linesModified = 0;
+		}
 		return todayStats;
 	}
 

@@ -73,8 +73,9 @@ class StatsTreeDataProvider {
                     new StatsTreeItem(`$(clock) 코딩 시간: ${this.calculator.formatTime(todayStats.codingTime)}`, vscode.TreeItemCollapsibleState.None, undefined, '오늘-코딩 시간'),
                     new StatsTreeItem(`$(keyboard) 키스트로크: ${todayStats.keystrokes.toLocaleString()}`, vscode.TreeItemCollapsibleState.None, undefined, '오늘-키스트로크'),
                     new StatsTreeItem(`$(file) 편집한 파일: ${todayStats.filesEdited.size}개`, vscode.TreeItemCollapsibleState.None, undefined, '오늘-편집한 파일'),
-                    new StatsTreeItem(`$(arrow-down) 추가한 라인: ${todayStats.linesAdded}`, vscode.TreeItemCollapsibleState.None, undefined, '오늘-추가한 라인'),
-                    new StatsTreeItem(`$(arrow-up) 삭제한 라인: ${todayStats.linesDeleted}`, vscode.TreeItemCollapsibleState.None, undefined, '오늘-삭제한 라인'),
+                    new StatsTreeItem(`$(edit) 수정한 라인: ${(todayStats.linesModified || 0).toLocaleString()}`, vscode.TreeItemCollapsibleState.None, undefined, '오늘-수정한 라인'),
+                    new StatsTreeItem(`$(arrow-down) 추가한 라인: ${todayStats.linesAdded.toLocaleString()}`, vscode.TreeItemCollapsibleState.None, undefined, '오늘-추가한 라인'),
+                    new StatsTreeItem(`$(arrow-up) 삭제한 라인: ${todayStats.linesDeleted.toLocaleString()}`, vscode.TreeItemCollapsibleState.None, undefined, '오늘-삭제한 라인'),
                 ], '오늘'));
             }
             // 전체 통계 섹션
@@ -82,6 +83,7 @@ class StatsTreeDataProvider {
                 new StatsTreeItem(`$(clock) 총 코딩 시간: ${this.calculator.formatTime(allTimeStats.codingTime)}`, vscode.TreeItemCollapsibleState.None, undefined, '전체-코딩 시간'),
                 new StatsTreeItem(`$(keyboard) 총 키스트로크: ${allTimeStats.keystrokes.toLocaleString()}`, vscode.TreeItemCollapsibleState.None, undefined, '전체-키스트로크'),
                 new StatsTreeItem(`$(file) 총 편집한 파일: ${allTimeStats.filesEdited}개`, vscode.TreeItemCollapsibleState.None, undefined, '전체-편집한 파일'),
+                new StatsTreeItem(`$(edit) 총 수정한 라인: ${(allTimeStats.linesModified || 0).toLocaleString()}`, vscode.TreeItemCollapsibleState.None, undefined, '전체-수정한 라인'),
                 new StatsTreeItem(`$(arrow-down) 총 추가한 라인: ${allTimeStats.linesAdded.toLocaleString()}`, vscode.TreeItemCollapsibleState.None, undefined, '전체-추가한 라인'),
                 new StatsTreeItem(`$(arrow-up) 총 삭제한 라인: ${allTimeStats.linesDeleted.toLocaleString()}`, vscode.TreeItemCollapsibleState.None, undefined, '전체-삭제한 라인'),
                 new StatsTreeItem('$(symbol-color) 언어별 통계', vscode.TreeItemCollapsibleState.Expanded, this.getLanguageItemsFromStats(allTimeStats.languages), '전체-언어별 통계'),

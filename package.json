@@ -20,7 +20,7 @@
     "commands": [
       {
         "command": "haneui-yoman.showStats",
-        "title": "개발 활동 통계 보기",
+        "title": "개발 활동 통계 보기",     
         "icon": "$(graph)"
       },
       {

@@ -45,6 +45,8 @@ const dashboard_1 = require("./dashboard");
 let tracker = null;
 function activate(context) {
     console.log('개발 활동 측정 익스텐션 "haneui-yoman"이 활성화되었습니다!');
+    // Git 커밋 메시지 입력란 제어
+    setupGitCommitMessageControl(context);
     // 상태바 생성
     const statusBar = new statusBar_1.StatusBar(context);
     // 스토리지 및 통계 계산기 초기화
@@ -140,6 +142,173 @@ function activate(context) {
         });
         context.globalState.update('haneui-yoman.firstRun', false);
     }
+}
+function setupGitCommitMessageControl(context) {
+    // Git Extension API를 통한 커밋 메시지 제어
+    const gitExtension = vscode.extensions.getExtension('vscode.git');
+    if (!gitExtension) {
+        console.log('Git Extension이 없습니다.');
+        return;
+    }
+    // Git Extension 활성화 대기
+    gitExtension.activate().then(() => {
+        const git = gitExtension.exports.getAPI(1);
+        if (!git) {
+            console.log('Git API를 가져올 수 없습니다.');
+            return;
+        }
+        // 모든 리포지토리에 대해 커밋 메시지 제어 설정
+        const repositories = git.repositories;
+        if (repositories.length === 0) {
+            // 리포지토리가 없으면 나중에 추가될 때를 대비해 이벤트 리스너 등록
+            const onDidOpenRepository = git.onDidOpenRepository((repository) => {
+                setupRepositoryCommitMessage(repository);
+            });
+            context.subscriptions.push({ dispose: () => onDidOpenRepository.dispose() });
+        }
+        else {
+            repositories.forEach((repository) => {
+                setupRepositoryCommitMessage(repository);
+            });
+        }
+        // 새 리포지토리가 열릴 때마다 설정
+        const onDidOpenRepository = git.onDidOpenRepository((repository) => {
+            setupRepositoryCommitMessage(repository);
+        });
+        context.subscriptions.push({ dispose: () => onDidOpenRepository.dispose() });
+    });
+}
+function setupRepositoryCommitMessage(repository) {
+    // Source Control의 inputBox에 접근
+    const sourceControl = repository.sourceControl;
+    if (!sourceControl || !sourceControl.inputBox) {
+        return;
+    }
+    const inputBox = sourceControl.inputBox;
+    // 코드 변경 내용 분석하여 적절한 템플릿 선택
+    const analyzeChangesAndGetTemplate = () => {
+        const changes = repository.state.workingTreeChanges;
+        if (!changes || changes.length === 0) {
+            return 'Feat: ';
+        }
+        // 기본값은 Feat:
+        let template = 'Feat: ';
+        let addedFiles = 0;
+        let deletedFiles = 0;
+        let modifiedFiles = 0;
+        const fileNames = [];
+        let totalAdditions = 0;
+        let totalDeletions = 0;
+        for (const change of changes) {
+            const fileName = change.uri.fsPath.toLowerCase();
+            fileNames.push(fileName);
+            // 파일 상태 확인 (Git API의 상태 사용)
+            const status = change.status;
+            // Git API의 상태는 숫자로 표현됨 (1: 추가, 2: 수정, 3: 삭제 등)
+            if (status === 1 || status === 5) { // INDEX_ADDED or UNTRACKED
+                addedFiles++;
+            }
+            else if (status === 3) { // DELETED
+                deletedFiles++;
+            }
+            else {
+                modifiedFiles++;
+            }
+            // 변경 내용 분석 (간단한 휴리스틱)
+            // 실제로는 diff를 분석해야 하지만, 파일명과 상태로 추정
+            if (status === 2) { // MODIFIED
+                totalAdditions += 10; // 예상값
+                totalDeletions += 5; // 예상값
+            }
+        }
+        // 파일명 기반 분석
+        const allFileNames = fileNames.join(' ');
+        // Fix 관련 키워드
+        if (allFileNames.includes('fix') ||
+            allFileNames.includes('bug') ||
+            allFileNames.includes('error') ||
+            allFileNames.includes('issue') ||
+            allFileNames.includes('patch') ||
+            allFileNames.includes('hotfix')) {
+            template = 'Fix: ';
+        }
+        // Test 관련
+        else if (allFileNames.includes('test') ||
+            allFileNames.includes('spec') ||
+            allFileNames.includes('__tests__')) {
+            template = 'Test: ';
+        }
+        // 문서 관련
+        else if (allFileNames.includes('readme') ||
+            allFileNames.includes('doc') ||
+            allFileNames.includes('changelog') ||
+            allFileNames.includes('license') ||
+            allFileNames.includes('.md')) {
+            template = 'Docs: ';
+        }
+        // 스타일/디자인 관련
+        else if (allFileNames.includes('style') ||
+            allFileNames.includes('css') ||
+            allFileNames.includes('scss') ||
+            allFileNames.includes('ui') ||
+            allFileNames.includes('design')) {
+            template = 'Style: ';
+        }
+        // 리팩토링 관련 (삭제가 많거나 변경이 큰 경우)
+        else if (deletedFiles > 0 ||
+            (totalDeletions > totalAdditions && totalDeletions > 50) ||
+            allFileNames.includes('refactor') ||
+            allFileNames.includes('cleanup')) {
+            template = 'Refactor: ';
+        }
+        // 성능 관련
+        else if (allFileNames.includes('perf') ||
+            allFileNames.includes('performance') ||
+            allFileNames.includes('optimize')) {
+            template = 'Perf: ';
+        }
+        // 빌드/설정 관련
+        else if (allFileNames.includes('config') ||
+            allFileNames.includes('build') ||
+            allFileNames.includes('package.json') ||
+            allFileNames.includes('tsconfig') ||
+            allFileNames.includes('webpack') ||
+            allFileNames.includes('.gitignore')) {
+            template = 'Chore: ';
+        }
+        // 기본값은 Feat: (이미 설정됨)
+        return template;
+    };
+    // 커밋 메시지가 비어있을 때 템플릿 제공
+    const applyCommitTemplate = () => {
+        if (inputBox.value.trim().length === 0) {
+            // 코드 변경 내용 분석하여 적절한 템플릿 선택
+            const template = analyzeChangesAndGetTemplate();
+            inputBox.value = template;
+        }
+    };
+    // Source Control 상태 변경 감지
+    const onDidChangeState = repository.state.onDidChange(() => {
+        // 변경사항이 있을 때만 템플릿 적용
+        if (inputBox.value.trim().length === 0) {
+            setTimeout(() => {
+                applyCommitTemplate();
+            }, 100);
+        }
+    });
+    // 초기 템플릿 적용
+    setTimeout(() => {
+        applyCommitTemplate();
+    }, 500);
+    // 커밋 메시지 변경 감지
+    const onDidChange = inputBox.onDidChange((value) => {
+        // 커밋 메시지가 비어있으면 템플릿 다시 적용
+        if (value.trim().length === 0) {
+            setTimeout(() => {
+                applyCommitTemplate();
+            }, 100);
+        }
+    });
 }
 function deactivate() {
     if (tracker) {
